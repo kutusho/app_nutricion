@@ -141,6 +141,13 @@ def init_session_state():
     """Crea datos por defecto la primera vez que se abre la app."""
     today = date.today()
 
+    # ---- Estado de autenticación ----
+    if "logged_in" not in st.session_state:
+        st.session_state["logged_in"] = False
+    if "username" not in st.session_state:
+        st.session_state["username"] = None
+
+    # ---- Datos de seguimiento ----
     if "initial_weight" not in st.session_state:
         st.session_state["initial_weight"] = 80.0  # kg (ejemplo)
     if "current_weight" not in st.session_state:
@@ -315,6 +322,58 @@ def show_top_summary():
         unsafe_allow_html=True,
     )
 
+# -------------------------------------------------------------
+# SECCIÓN LOGIN
+# -------------------------------------------------------------
+def show_login():
+    """
+    Sección de iniciar sesión.
+    Por ahora usa credenciales de ejemplo:
+    usuario: 'paciente', contraseña: 'nutri123'
+    """
+    st.markdown('<div class="main-title">🔐 Iniciar sesión</div>', unsafe_allow_html=True)
+    st.markdown(
+        '<div class="subtitle">Accede a tu panel de seguimiento nutricional con tu usuario asignado.</div>',
+        unsafe_allow_html=True,
+    )
+
+    col1, col2 = st.columns([2, 1])
+
+    with col1:
+        with st.form("login_form"):
+            username = st.text_input("Usuario")
+            password = st.text_input("Contraseña", type="password")
+            submit = st.form_submit_button("Entrar")
+
+        if submit:
+            # Credenciales de ejemplo. Aquí luego se puede conectar a DB, Google Sheets, etc.
+            if username == "paciente" and password == "nutri123":
+                st.session_state["logged_in"] = True
+                st.session_state["username"] = username
+                st.success("Bienvenido a tu App de Seguimiento Nutricional 🥦")
+            else:
+                st.error("Usuario o contraseña incorrectos. Intenta de nuevo.")
+
+    with col2:
+        st.markdown(
+            """
+            <div class="card-soft">
+                <div class="card-title">¿Qué es esta app?</div>
+                <p style="font-size:0.88rem; color:#374151;">
+                    Esta plataforma te permite ver tu peso inicial, peso actual, 
+                    tu peso objetivo y la fecha de tu próxima cita, además de 
+                    registrar si estás cumpliendo con tu plan de alimentación.
+                </p>
+                <p style="font-size:0.85rem; color:#4b5563;">
+                    Las credenciales de acceso son asignadas por tu nutrióloga. 
+                    Si tienes dudas, contáctala directamente.
+                </p>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    return st.session_state.get("logged_in", False)
 
 # -------------------------------------------------------------
 # SECCIÓN 1: SEGUIMIENTO PROFESIONAL (DASHBOARD)
@@ -441,7 +500,6 @@ def show_dashboard():
         unsafe_allow_html=True,
     )
 
-
 # -------------------------------------------------------------
 # SECCIÓN 2: MI PLAN DE ALIMENTACIÓN
 # -------------------------------------------------------------
@@ -489,7 +547,6 @@ def show_plan():
         > Puedes modificar directamente el código de esta sección para adaptar tu propio plan.
         """
     )
-
 
 # -------------------------------------------------------------
 # SECCIÓN 3: REGISTRO DIARIO
@@ -589,7 +646,6 @@ def show_daily_log():
             use_container_width=True,
         )
 
-
 # -------------------------------------------------------------
 # SECCIÓN 4: PROGRESO
 # -------------------------------------------------------------
@@ -677,7 +733,6 @@ def show_progress():
             unsafe_allow_html=True,
         )
 
-
 # -------------------------------------------------------------
 # SECCIÓN 5: CONTACTO CON LA NUTRIÓLOGA
 # -------------------------------------------------------------
@@ -733,7 +788,6 @@ def show_contact():
             unsafe_allow_html=True,
         )
 
-
 # -------------------------------------------------------------
 # FUNCIÓN PRINCIPAL
 # -------------------------------------------------------------
@@ -741,7 +795,25 @@ def main():
     # Inicializar estado
     init_session_state()
 
-    # SIDEBAR (Navegación + datos clave)
+    # Si NO está logueado, mostrar únicamente pantalla de login
+    if not st.session_state["logged_in"]:
+        # Sidebar mínimo cuando no está autenticado
+        with st.sidebar:
+            st.markdown("### 🥗 App de Seguimiento Nutricional")
+            st.markdown(
+                """
+                <span class="small-label">Acompañamiento profesional</span><br>
+                L.N. <strong>Brenda López Hernández</strong><br>
+                <span style="font-size:0.8rem;">Cédula profesional 11036805</span>
+                """,
+                unsafe_allow_html=True,
+            )
+            st.markdown("---")
+            st.info("Por favor inicia sesión para acceder a tu panel.")
+        show_login()
+        return
+
+    # ---- SIDEBAR COMPLETO CUANDO YA INICIÓ SESIÓN ----
     with st.sidebar:
         st.markdown("### 🥗 App de Seguimiento Nutricional")
         st.markdown(
@@ -752,8 +824,20 @@ def main():
             """,
             unsafe_allow_html=True,
         )
-        st.markdown("---")
 
+        if st.session_state.get("username"):
+            st.markdown(
+                f"👤 <span style='font-size:0.9rem;'>Sesión iniciada como <strong>{st.session_state['username']}</strong></span>",
+                unsafe_allow_html=True,
+            )
+
+        # Botón para cerrar sesión
+        if st.button("Cerrar sesión"):
+            st.session_state["logged_in"] = False
+            st.session_state["username"] = None
+            st.experimental_rerun()
+
+        st.markdown("---")
         st.markdown("#### ⚖️ Mis datos")
         st.session_state["initial_weight"] = st.number_input(
             "Peso inicial (kg)",
@@ -811,7 +895,7 @@ def main():
     # Actualizar historial de peso con el valor de hoy
     sync_weight_with_today()
 
-    # Contenido principal
+    # Contenido principal por sección
     if menu == "Seguimiento profesional":
         show_dashboard()
     elif menu == "Mi plan de alimentación":
